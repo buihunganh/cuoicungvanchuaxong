@@ -100,7 +100,7 @@ namespace BTL_WEBDEV2025.Controllers
                 }
 
                 ModelState.Clear();
-                ModelState.AddModelError("Password", "Sai mật khẩu");
+                ModelState.AddModelError("Password", "Password incorrect");
                 model.ShowPassword = true;
                 model.IsNewUser = false;
                 return View(model);
