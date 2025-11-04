@@ -31,7 +31,7 @@ body {
   display: flex;
   align-items: center;
   justify-content: center;
-  background: linear-gradient(135deg, #0b0b0b 0%, #1c1c1c 100%);
+  background: rgba(0, 0, 0, 0.8); /* Nền đen trong suốt */
   transition: opacity 0.4s ease, visibility 0.4s ease;
 }
 
@@ -69,20 +69,19 @@ body {
   height: 64px;
   border-radius: 50%;
   border: 3px solid transparent;
-  border-top-color: #ffffff;
-  border-right-color: #f04e23;
+  border-top-color: #ffffff;  /* Thay đổi sang màu trắng */
+  border-right-color: #ffffff; /* Thay đổi sang màu trắng */
   animation: loader-spin 0.9s linear infinite;
-  box-shadow: 0 0 18px rgba(240, 78, 35, 0.45);
+  box-shadow: 0 0 18px rgba(255, 255, 255, 0.45); /* Đổi màu_shadow nếu cần */
 }
 
 .page-loader__text {
   font-size: 0.9rem;
   letter-spacing: 0.3rem;
   text-transform: uppercase;
-  color: #f5f5f5;
+  color: #f5f5f5; /* Có thể thay đổi sang màu trắng nếu cần */
   opacity: 0.75;
 }
-
 .page-loader--hidden {
   opacity: 0;
   visibility: hidden;
