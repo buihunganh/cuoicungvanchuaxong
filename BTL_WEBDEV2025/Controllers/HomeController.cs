@@ -110,14 +110,14 @@ namespace BTL_WEBDEV2025.Controllers
         {
             return new List<Product>
             {
-                new Product { Id = 1, Name = "Air Max 270", Description = "Premium running shoes", Price = 150, ImageUrl = "https://via.placeholder.com/300", Category = "Men", IsFeatured = true },
-                new Product { Id = 2, Name = "Air Force 1", Description = "Classic lifestyle shoes", Price = 90, DiscountPrice = 70, ImageUrl = "https://via.placeholder.com/300", Category = "Unisex", IsFeatured = true, IsSpecialDeal = true },
-                new Product { Id = 3, Name = "Zoom Pegasus", Description = "High-performance running", Price = 120, ImageUrl = "https://via.placeholder.com/300", Category = "Men", IsFeatured = true },
-                new Product { Id = 4, Name = "Revolution 6", Description = "Everyday running", Price = 60, ImageUrl = "https://via.placeholder.com/300", Category = "Women", IsFeatured = true },
-                new Product { Id = 5, Name = "Court Vision", Description = "Basketball lifestyle", Price = 65, DiscountPrice = 45, ImageUrl = "https://via.placeholder.com/300", Category = "Men", IsSpecialDeal = true },
-                new Product { Id = 6, Name = "React Element", Description = "Futuristic design", Price = 130, ImageUrl = "https://via.placeholder.com/300", Category = "Unisex", IsFeatured = true },
-                new Product { Id = 7, Name = "Free RN", Description = "Natural motion", Price = 80, DiscountPrice = 60, ImageUrl = "https://via.placeholder.com/300", Category = "Women", IsSpecialDeal = true },
-                new Product { Id = 8, Name = "Dunk Low", Description = "Skateboarding classic", Price = 100, ImageUrl = "https://via.placeholder.com/300", Category = "Unisex", IsFeatured = true }
+                new Product { Id = 1, Name = "Air Max 270", Description = "Premium running shoes", Price = 150, ImageUrl = "https://via.placeholder.com/300", CategoryId = 1, IsFeatured = true },
+                new Product { Id = 2, Name = "Air Force 1", Description = "Classic lifestyle shoes", Price = 90, DiscountPrice = 70, ImageUrl = "https://via.placeholder.com/300", CategoryId = 4, IsFeatured = true, IsSpecialDeal = true },
+                new Product { Id = 3, Name = "Zoom Pegasus", Description = "High-performance running", Price = 120, ImageUrl = "https://via.placeholder.com/300", CategoryId = 1, IsFeatured = true },
+                new Product { Id = 4, Name = "Revolution 6", Description = "Everyday running", Price = 60, ImageUrl = "https://via.placeholder.com/300", CategoryId = 2, IsFeatured = true },
+                new Product { Id = 5, Name = "Court Vision", Description = "Basketball lifestyle", Price = 65, DiscountPrice = 45, ImageUrl = "https://via.placeholder.com/300", CategoryId = 1, IsSpecialDeal = true },
+                new Product { Id = 6, Name = "React Element", Description = "Futuristic design", Price = 130, ImageUrl = "https://via.placeholder.com/300", CategoryId = 4, IsFeatured = true },
+                new Product { Id = 7, Name = "Free RN", Description = "Natural motion", Price = 80, DiscountPrice = 60, ImageUrl = "https://via.placeholder.com/300", CategoryId = 2, IsSpecialDeal = true },
+                new Product { Id = 8, Name = "Dunk Low", Description = "Skateboarding classic", Price = 100, ImageUrl = "https://via.placeholder.com/300", CategoryId = 4, IsFeatured = true }
             };
         }
 

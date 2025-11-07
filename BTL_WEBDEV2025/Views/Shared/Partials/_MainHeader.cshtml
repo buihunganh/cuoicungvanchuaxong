@@ -144,16 +144,17 @@
         <div class="flex-grow-1 w-100">
           <h5 id="orderModalName" class="mb-1">Product name</h5>
           <div id="orderModalPrice" class="text-muted mb-3">$0</div>
+          <div id="orderModalCode" class="text-muted small mb-3" style="display: none;">Product ID: #<span id="orderModalCodeValue"></span></div>
 
-          <div class="mb-2">
+          <div class="mb-2" id="sizeFieldContainer" style="display: none;">
             <label for="orderSize">Size</label>
             <select id="orderSize" class="form-control"></select>
           </div>
-          <div class="mb-2">
+          <div class="mb-2" id="colorFieldContainer" style="display: none;">
             <label for="orderColor">Color</label>
             <select id="orderColor" class="form-control"></select>
           </div>
-          <div class="mb-2">
+          <div class="mb-2" id="qtyFieldContainer" style="display: none;">
             <label for="orderQty">Quantity</label>
             <input id="orderQty" type="number" min="1" value="1" class="form-control" />
           </div>
@@ -204,13 +205,123 @@ window.isAuthenticated = @isAuth;
     const imgEl = modal.querySelector('#orderModalImage');
     const nameEl = modal.querySelector('#orderModalName');
     const priceEl = modal.querySelector('#orderModalPrice');
+    const codeEl = modal.querySelector('#orderModalCode');
+    const codeValueEl = modal.querySelector('#orderModalCodeValue');
     const sizeEl = modal.querySelector('#orderSize');
     const colorEl = modal.querySelector('#orderColor');
     const qtyEl = modal.querySelector('#orderQty');
+    const sizeContainer = modal.querySelector('#sizeFieldContainer');
+    const colorContainer = modal.querySelector('#colorFieldContainer');
+    const qtyContainer = modal.querySelector('#qtyFieldContainer');
     const addBtn = modal.querySelector('#addToCartBtn');
+    
+    let currentVariants = [];
 
     function showModal(){ modal.classList.add('show'); modal.setAttribute('aria-hidden','false'); document.body.style.overflow='hidden'; }
     function hideModal(){ modal.classList.remove('show'); modal.setAttribute('aria-hidden','true'); document.body.style.overflow=''; }
+    
+    async function loadProductVariants(productId) {
+        if(!productId || productId === '0' || productId === '') {
+            // Hide all fields if no product ID
+            if(sizeContainer) sizeContainer.style.display = 'none';
+            if(colorContainer) colorContainer.style.display = 'none';
+            if(qtyContainer) qtyContainer.style.display = 'none';
+            return;
+        }
+        
+        try {
+            const response = await fetch(`/Products/GetProductVariants?productId=${productId}`);
+            const data = await response.json();
+            
+            if(data.success && data.variants && data.variants.length > 0) {
+                currentVariants = data.variants;
+                
+                // Populate Size dropdown
+                if(data.sizes && data.sizes.length > 0 && sizeEl && sizeContainer) {
+                    sizeEl.innerHTML = '<option value="">Select Size</option>';
+                    data.sizes.forEach(size => {
+                        const option = document.createElement('option');
+                        option.value = size;
+                        option.textContent = size;
+                        sizeEl.appendChild(option);
+                    });
+                    sizeContainer.style.display = 'block';
+                } else if(sizeContainer) {
+                    sizeContainer.style.display = 'none';
+                }
+                
+                // Populate Color dropdown
+                if(data.colors && data.colors.length > 0 && colorEl && colorContainer) {
+                    colorEl.innerHTML = '<option value="">Select Color</option>';
+                    data.colors.forEach(color => {
+                        const option = document.createElement('option');
+                        option.value = color;
+                        option.textContent = color;
+                        colorEl.appendChild(option);
+                    });
+                    colorContainer.style.display = 'block';
+                } else if(colorContainer) {
+                    colorContainer.style.display = 'none';
+                }
+                
+                // Show quantity field if variants exist
+                if(qtyContainer) {
+                    qtyContainer.style.display = 'block';
+                    if(qtyEl) {
+                        qtyEl.value = 1;
+                        qtyEl.max = ''; // Will be set based on selected variant
+                    }
+                }
+                
+                // Update max quantity when size/color changes (remove old listeners first)
+                if(sizeEl) {
+                    sizeEl.removeEventListener('change', updateMaxQuantity);
+                    sizeEl.addEventListener('change', updateMaxQuantity);
+                }
+                if(colorEl) {
+                    colorEl.removeEventListener('change', updateMaxQuantity);
+                    colorEl.addEventListener('change', updateMaxQuantity);
+                }
+                
+                // Initial quantity update
+                updateMaxQuantity();
+                
+            } else {
+                // No variants in database - hide all fields
+                if(sizeContainer) sizeContainer.style.display = 'none';
+                if(colorContainer) colorContainer.style.display = 'none';
+                if(qtyContainer) qtyContainer.style.display = 'none';
+            }
+        } catch(error) {
+            console.error('Error loading product variants:', error);
+            // Hide fields on error
+            if(sizeContainer) sizeContainer.style.display = 'none';
+            if(colorContainer) colorContainer.style.display = 'none';
+            if(qtyContainer) qtyContainer.style.display = 'none';
+        }
+    }
+    
+    function updateMaxQuantity() {
+        if(!qtyEl || !currentVariants || currentVariants.length === 0) return;
+        
+        const selectedSize = sizeEl ? sizeEl.value : '';
+        const selectedColor = colorEl ? colorEl.value : '';
+        
+        // Find matching variant
+        const variant = currentVariants.find(v => 
+            (!selectedSize || v.size === selectedSize) && 
+            (!selectedColor || v.color === selectedColor)
+        );
+        
+        if(variant && variant.stockQuantity > 0) {
+            qtyEl.max = variant.stockQuantity;
+            if(parseInt(qtyEl.value) > variant.stockQuantity) {
+                qtyEl.value = variant.stockQuantity;
+            }
+        } else {
+            qtyEl.max = '';
+        }
+    }
 
     document.addEventListener('click', function(e){
         const btn = e.target.closest('.order-btn');
@@ -274,11 +385,17 @@ window.isAuthenticated = @isAuth;
         
         // Format price for display - always show 2 decimal places
         if(priceEl) priceEl.textContent = '$' + priceNum.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2});
+        
+        // Display Product ID if available
+        if(productId && codeValueEl && codeEl) {
+            codeValueEl.textContent = productId;
+            codeEl.style.display = 'block';
+        } else if(codeEl) {
+            codeEl.style.display = 'none';
+        }
 
-        // populate defaults for size/color
-        if(sizeEl){ sizeEl.innerHTML=''; ['6','6.5','7','7.5','8','8.5','9','10','11','12'].forEach(s=>{ const o=document.createElement('option'); o.value=s; o.textContent=s; sizeEl.appendChild(o); }); }
-        if(colorEl){ colorEl.innerHTML=''; ['White','Black','Red','Blue','Green','Grey'].forEach(c=>{ const o=document.createElement('option'); o.value=c; o.textContent=c; colorEl.appendChild(o); }); }
-        if(qtyEl) qtyEl.value = 1;
+        // Load variants from database
+        loadProductVariants(productId);
 
         modal.dataset.name = name; modal.dataset.price = priceNum.toString(); modal.dataset.img = img; modal.dataset.productId = productId;
 

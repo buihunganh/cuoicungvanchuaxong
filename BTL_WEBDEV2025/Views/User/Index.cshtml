@@ -162,6 +162,24 @@
                                                                     <strong>@it.ProductName</strong>
                                                                     <br />
                                                                     <small class="text-muted">Product ID: #@it.ProductId</small>
+                                                                    @if (!string.IsNullOrWhiteSpace(it.Size) || !string.IsNullOrWhiteSpace(it.Color))
+                                                                    {
+                                                                        <br />
+                                                                        <small class="text-muted">
+                                                                            @if (!string.IsNullOrWhiteSpace(it.Size))
+                                                                            {
+                                                                                <span>Size: @it.Size</span>
+                                                                            }
+                                                                            @if (!string.IsNullOrWhiteSpace(it.Size) && !string.IsNullOrWhiteSpace(it.Color))
+                                                                            {
+                                                                                <span> | </span>
+                                                                            }
+                                                                            @if (!string.IsNullOrWhiteSpace(it.Color))
+                                                                            {
+                                                                                <span>Color: @it.Color</span>
+                                                                            }
+                                                                        </small>
+                                                                    }
                                                                 </td>
                                                                 <td class="text-center">@it.Quantity</td>
                                                                 <td class="text-end">@String.Format(System.Globalization.CultureInfo.GetCultureInfo("en-US"), "{0:C}", (decimal)it.UnitPrice)</td>

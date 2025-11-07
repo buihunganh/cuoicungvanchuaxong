@@ -47,8 +47,8 @@ namespace BTL_WEBDEV2025.Controllers
             catch { }
 
             brands = all.Select(p => p.Brand?.Name ?? "Others").Distinct().ToList();
-            products = all.Where(p => string.Equals(p.Category, "Men", System.StringComparison.OrdinalIgnoreCase)
-                                       || string.Equals(p.Category, "Unisex", System.StringComparison.OrdinalIgnoreCase))
+            products = all.Where(p => (p.CategoryRef != null && (p.CategoryRef.Name == "Men" || p.CategoryRef.Name == "Unisex"))
+                                       || (p.CategoryId == 1 || p.CategoryId == 4))
                           .ToList();
 
             ViewBag.Brands = brands;
@@ -77,8 +77,8 @@ namespace BTL_WEBDEV2025.Controllers
             catch { }
 
             brands = all.Select(p => p.Brand?.Name ?? "Others").Distinct().ToList();
-            products = all.Where(p => string.Equals(p.Category, "Women", System.StringComparison.OrdinalIgnoreCase)
-                                       || string.Equals(p.Category, "Unisex", System.StringComparison.OrdinalIgnoreCase))
+            products = all.Where(p => (p.CategoryRef != null && (p.CategoryRef.Name == "Women" || p.CategoryRef.Name == "Unisex"))
+                                       || (p.CategoryId == 2 || p.CategoryId == 4))
                           .ToList();
 
             ViewBag.Brands = brands;
@@ -107,8 +107,8 @@ namespace BTL_WEBDEV2025.Controllers
             catch { }
 
             brands = all.Select(p => p.Brand?.Name ?? "Others").Distinct().ToList();
-            products = all.Where(p => string.Equals(p.Category, "Kid", System.StringComparison.OrdinalIgnoreCase)
-                                       || string.Equals(p.Category, "Unisex", System.StringComparison.OrdinalIgnoreCase))
+            products = all.Where(p => (p.CategoryRef != null && (p.CategoryRef.Name == "Kid" || p.CategoryRef.Name == "Unisex"))
+                                       || (p.CategoryId == 3 || p.CategoryId == 4))
                           .ToList();
 
             ViewBag.Brands = brands;
@@ -162,16 +162,16 @@ namespace BTL_WEBDEV2025.Controllers
         {
             return new List<Product>
             {
-                new Product { Id = 1, Name = "Air Max 270", Description = "Premium running shoes with Air Max technology", Price = 150, ImageUrl = "https://via.placeholder.com/300", Category = "Men", IsFeatured = true },
-                new Product { Id = 2, Name = "Air Force 1", Description = "Classic lifestyle shoes", Price = 90, DiscountPrice = 70, ImageUrl = "https://via.placeholder.com/300", Category = "Unisex", IsFeatured = true, IsSpecialDeal = true },
-                new Product { Id = 3, Name = "Zoom Pegasus", Description = "High-performance running shoes", Price = 120, ImageUrl = "https://via.placeholder.com/300", Category = "Men", IsFeatured = true },
-                new Product { Id = 4, Name = "Revolution 6", Description = "Everyday running for women", Price = 60, ImageUrl = "https://via.placeholder.com/300", Category = "Women", IsFeatured = true },
-                new Product { Id = 5, Name = "Court Vision", Description = "Basketball lifestyle shoes", Price = 65, DiscountPrice = 45, ImageUrl = "https://via.placeholder.com/300", Category = "Men", IsSpecialDeal = true },
-                new Product { Id = 6, Name = "React Element", Description = "Futuristic design sneakers", Price = 130, ImageUrl = "https://via.placeholder.com/300", Category = "Unisex", IsFeatured = true },
-                new Product { Id = 7, Name = "Free RN", Description = "Natural motion running shoes", Price = 80, DiscountPrice = 60, ImageUrl = "https://via.placeholder.com/300", Category = "Women", IsSpecialDeal = true },
-                new Product { Id = 8, Name = "Dunk Low", Description = "Skateboarding classic", Price = 100, ImageUrl = "https://via.placeholder.com/300", Category = "Unisex", IsFeatured = true },
-                new Product { Id = 9, Name = "Kids Air Max", Description = "Comfortable running for kids", Price = 70, ImageUrl = "https://via.placeholder.com/300", Category = "Kid", IsFeatured = false },
-                new Product { Id = 10, Name = "Kids Basketball", Description = "Basketball shoes for young athletes", Price = 50, DiscountPrice = 35, ImageUrl = "https://via.placeholder.com/300", Category = "Kid", IsSpecialDeal = true }
+                new Product { Id = 1, Name = "Air Max 270", Description = "Premium running shoes with Air Max technology", Price = 150, ImageUrl = "https://via.placeholder.com/300", CategoryId = 1, IsFeatured = true },
+                new Product { Id = 2, Name = "Air Force 1", Description = "Classic lifestyle shoes", Price = 90, DiscountPrice = 70, ImageUrl = "https://via.placeholder.com/300", CategoryId = 4, IsFeatured = true, IsSpecialDeal = true },
+                new Product { Id = 3, Name = "Zoom Pegasus", Description = "High-performance running shoes", Price = 120, ImageUrl = "https://via.placeholder.com/300", CategoryId = 1, IsFeatured = true },
+                new Product { Id = 4, Name = "Revolution 6", Description = "Everyday running for women", Price = 60, ImageUrl = "https://via.placeholder.com/300", CategoryId = 2, IsFeatured = true },
+                new Product { Id = 5, Name = "Court Vision", Description = "Basketball lifestyle shoes", Price = 65, DiscountPrice = 45, ImageUrl = "https://via.placeholder.com/300", CategoryId = 1, IsSpecialDeal = true },
+                new Product { Id = 6, Name = "React Element", Description = "Futuristic design sneakers", Price = 130, ImageUrl = "https://via.placeholder.com/300", CategoryId = 4, IsFeatured = true },
+                new Product { Id = 7, Name = "Free RN", Description = "Natural motion running shoes", Price = 80, DiscountPrice = 60, ImageUrl = "https://via.placeholder.com/300", CategoryId = 2, IsSpecialDeal = true },
+                new Product { Id = 8, Name = "Dunk Low", Description = "Skateboarding classic", Price = 100, ImageUrl = "https://via.placeholder.com/300", CategoryId = 4, IsFeatured = true },
+                new Product { Id = 9, Name = "Kids Air Max", Description = "Comfortable running for kids", Price = 70, ImageUrl = "https://via.placeholder.com/300", CategoryId = 3, IsFeatured = false },
+                new Product { Id = 10, Name = "Kids Basketball", Description = "Basketball shoes for young athletes", Price = 50, DiscountPrice = 35, ImageUrl = "https://via.placeholder.com/300", CategoryId = 3, IsSpecialDeal = true }
             };
         }
 
@@ -187,6 +187,54 @@ namespace BTL_WEBDEV2025.Controllers
             }
             catch { }
             return _fallbackProducts;
+        }
+
+        [HttpGet]
+        public async Task<IActionResult> GetProductVariants(int productId)
+        {
+            try
+            {
+                var variants = await _db.ProductVariants
+                    .Where(v => v.ProductId == productId && v.StockQuantity > 0)
+                    .Select(v => new
+                    {
+                        v.Id,
+                        v.Size,
+                        v.Color,
+                        v.StockQuantity
+                    })
+                    .OrderBy(v => v.Size)
+                    .ThenBy(v => v.Color)
+                    .ToListAsync();
+
+
+                var sizes = variants
+                    .Where(v => !string.IsNullOrWhiteSpace(v.Size))
+                    .Select(v => v.Size)
+                    .Distinct()
+                    .OrderBy(s => s)
+                    .ToList();
+
+                var colors = variants
+                    .Where(v => !string.IsNullOrWhiteSpace(v.Color))
+                    .Select(v => v.Color)
+                    .Distinct()
+                    .OrderBy(c => c)
+                    .ToList();
+
+                return Json(new
+                {
+                    success = true,
+                    sizes = sizes,
+                    colors = colors,
+                    variants = variants
+                });
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error getting product variants for ProductId={ProductId}", productId);
+                return Json(new { success = false, sizes = new List<string>(), colors = new List<string>(), variants = new List<object>() });
+            }
         }
     }
 }

@@ -22,17 +22,16 @@ namespace BTL_WEBDEV2025.Controllers
         // GET: Admin
         public IActionResult Index()
         {
-            // Simple authentication check (có thể mở rộng với ASP.NET Identity)
+            // Simple authentication 
             if (!IsAdmin())
             {
                 return RedirectToAction("Login");
             }
-            
-            // View hiện render theo tab qua query string; dữ liệu sẽ nạp bằng AJAX từ API bên dưới
+
             return View();
         }
 
-        // GET: Admin/Login => dùng luồng đăng nhập hợp nhất
+        // GET: Admin/Login 
         public IActionResult Login()
         {
             return RedirectToAction("Login", "Account");
@@ -46,17 +45,20 @@ namespace BTL_WEBDEV2025.Controllers
         {
             if (!IsAdmin()) return Unauthorized();
 
-            // Doanh số (USD) = tổng TotalAmount trong Orders
+            //Total (USD) = tổng TotalAmount trong Orders
             var totalSales = await _db.Orders.SumAsync(o => (decimal?)o.TotalAmount) ?? 0m;
             var totalOrders = await _db.Orders.CountAsync();
-            // Khách hàng = Users trừ admin (RoleId != 1)
+            // Customer (RoleId != 1)
             var totalCustomers = await _db.Users.CountAsync(u => u.RoleId != 1);
+            // Profit = Revenue (tạm thời, vì chưa có cost price)
+            var profit = totalSales;
 
             return Ok(new
             {
                 totalSales,
                 totalOrders,
-                totalCustomers
+                totalCustomers,
+                profit
             });
         }
 
@@ -115,10 +117,36 @@ namespace BTL_WEBDEV2025.Controllers
                     p.Name,
                     p.Description,
                     p.Price,
-                    Category = p.CategoryRef != null ? p.CategoryRef.Name : (string.IsNullOrEmpty(p.Category) ? "" : p.Category),
-                    p.ImageUrl
+                    p.DiscountPrice,
+                    Category = p.CategoryRef != null ? p.CategoryRef.Name : "",
+                    CategoryId = p.CategoryId,
+                    p.ImageUrl,
+                    BrandId = p.BrandId,
+                    BrandName = p.Brand != null ? p.Brand.Name : ""
                 }).ToListAsync();
             return Ok(list);
+        }
+
+        [HttpGet("/admin/api/brands")]
+        public async Task<IActionResult> GetBrands()
+        {
+            if (!IsAdmin()) return Unauthorized();
+            var brands = await _db.Brands
+                .Select(b => new { b.Id, b.Name })
+                .OrderBy(b => b.Name)
+                .ToListAsync();
+            return Ok(brands);
+        }
+
+        [HttpGet("/admin/api/categories")]
+        public async Task<IActionResult> GetCategories()
+        {
+            if (!IsAdmin()) return Unauthorized();
+            var categories = await _db.Categories
+                .Select(c => new { c.Id, c.Name })
+                .OrderBy(c => c.Name)
+                .ToListAsync();
+            return Ok(categories);
         }
 
         public class ProductUpsertDto
@@ -130,26 +158,114 @@ namespace BTL_WEBDEV2025.Controllers
             [Range(0, double.MaxValue)]
             public decimal Price { get; set; }
             public string? ImageUrl { get; set; }
-            public string? Category { get; set; }
         }
 
         public class InventoryUpdateDto
         {
             public int StockQuantity { get; set; }
+            public string? Size { get; set; }
+            public string? Color { get; set; }
+        }
+
+        public class InventoryCreateDto
+        {
+            public int ProductId { get; set; }
+            public string Size { get; set; } = string.Empty;
+            public string Color { get; set; } = string.Empty;
+            public int StockQuantity { get; set; }
+        }
+
+        // Helper function to generate image file name
+        private string GenerateImageFileName(string brandFolder, string extension)
+        {
+            var webRoot = _env.WebRootPath;
+            var brandDir = Path.Combine(webRoot, "media", "images", "products", brandFolder);
+            Directory.CreateDirectory(brandDir);
+
+            int nextNumber = 1;
+            var escapedBrand = System.Text.RegularExpressions.Regex.Escape(brandFolder);
+            var extWithoutDot = extension.TrimStart('.').ToLowerInvariant();
+            var pattern = new System.Text.RegularExpressions.Regex(@"^" + escapedBrand + @"(\d+)\." + extWithoutDot + "$", System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+            
+            if (Directory.Exists(brandDir))
+            {
+                var allFiles = Directory.GetFiles(brandDir);
+                var numbers = allFiles
+                    .Select(f => Path.GetFileName(f))
+                    .Select(fn => pattern.Match(fn))
+                    .Where(m => m.Success)
+                    .Select(m => int.Parse(m.Groups[1].Value))
+                    .ToList();
+                
+                if (numbers.Any())
+                {
+                    nextNumber = numbers.Max() + 1;
+                }
+            }
+
+            return $"{brandFolder}{nextNumber:D2}{extension}";
         }
 
         [HttpPost("/admin/api/products/create")]
-        public async Task<IActionResult> CreateProduct([FromBody] ProductUpsertDto dto)
+        public async Task<IActionResult> CreateProduct([FromForm] string name, [FromForm] string description, [FromForm] decimal price, [FromForm] decimal? discountPrice, [FromForm] int? categoryId, [FromForm] int? brandId, IFormFile? imageFile)
         {
             if (!IsAdmin()) return Unauthorized();
-            if (!ModelState.IsValid) return BadRequest(ModelState);
+            
+            if (string.IsNullOrWhiteSpace(name))
+            {
+                return BadRequest("Name is required");
+            }
+
+            string imageUrl = string.Empty;
+
+            if (imageFile != null && imageFile.Length > 0)
+            {
+                var allowedExtensions = new[] { ".jpg", ".jpeg", ".png", ".webp" };
+                var ext = Path.GetExtension(imageFile.FileName).ToLowerInvariant();
+                
+                if (!allowedExtensions.Contains(ext))
+                {
+                    return BadRequest("Invalid image format. Allowed: jpg, jpeg, png, webp");
+                }
+
+                string brandFolder = "general";
+                if (brandId.HasValue)
+                {
+                    var brand = await _db.Brands.FirstOrDefaultAsync(b => b.Id == brandId.Value);
+                    if (brand != null)
+                    {
+                        brandFolder = brand.Name.ToLowerInvariant();
+                        foreach (var c in Path.GetInvalidFileNameChars())
+                        {
+                            brandFolder = brandFolder.Replace(c, '-');
+                        }
+                        brandFolder = brandFolder.Replace(" ", "-");
+                    }
+                }
+
+                var fileName = GenerateImageFileName(brandFolder, ext);
+                var webRoot = _env.WebRootPath;
+                var brandDir = Path.Combine(webRoot, "media", "images", "products", brandFolder);
+                Directory.CreateDirectory(brandDir);
+                var savePath = Path.Combine(brandDir, fileName);
+
+                using (var stream = System.IO.File.Create(savePath))
+                {
+                    await imageFile.CopyToAsync(stream);
+                }
+
+                imageUrl = $"/media/images/products/{brandFolder}/{fileName}";
+            }
+
             var product = new Product
             {
-                Name = dto.Name,
-                Description = dto.Description ?? string.Empty,
-                Price = dto.Price,
-                ImageUrl = dto.ImageUrl ?? string.Empty,
-                Category = dto.Category ?? string.Empty
+                Name = name,
+                Description = description ?? string.Empty,
+                Price = price,
+                DiscountPrice = discountPrice,
+                ImageUrl = imageUrl,
+                CategoryId = categoryId,
+                BrandId = brandId
             };
             _db.Products.Add(product);
             await _db.SaveChangesAsync();
@@ -157,16 +273,84 @@ namespace BTL_WEBDEV2025.Controllers
         }
 
         [HttpPost("/admin/api/products/update/{id:int}")]
-        public async Task<IActionResult> UpdateProduct(int id, [FromBody] ProductUpsertDto dto)
+        public async Task<IActionResult> UpdateProduct(int id, [FromForm] string name, [FromForm] string description, [FromForm] decimal price, [FromForm] decimal? discountPrice, [FromForm] int? categoryId, [FromForm] int? brandId, [FromForm] string? imageUrl, IFormFile? imageFile)
         {
             if (!IsAdmin()) return Unauthorized();
             var product = await _db.Products.FirstOrDefaultAsync(p => p.Id == id);
             if (product == null) return NotFound();
-            product.Name = dto.Name ?? product.Name;
-            product.Description = dto.Description ?? product.Description;
-            product.Price = dto.Price;
-            product.ImageUrl = dto.ImageUrl ?? product.ImageUrl;
-            if (!string.IsNullOrWhiteSpace(dto.Category)) product.Category = dto.Category!;
+
+            product.Name = name ?? product.Name;
+            product.Description = description ?? product.Description;
+            product.Price = price;
+            product.DiscountPrice = discountPrice;
+            if (categoryId.HasValue) product.CategoryId = categoryId.Value;
+            if (brandId.HasValue) product.BrandId = brandId.Value;
+
+            if (imageFile != null && imageFile.Length > 0)
+            {
+                var allowedExtensions = new[] { ".jpg", ".jpeg", ".png", ".webp" };
+                var ext = Path.GetExtension(imageFile.FileName).ToLowerInvariant();
+                
+                if (!allowedExtensions.Contains(ext))
+                {
+                    return BadRequest("Invalid image format. Allowed: jpg, jpeg, png, webp");
+                }
+
+                string brandFolder = "general";
+                if (brandId.HasValue)
+                {
+                    var brand = await _db.Brands.FirstOrDefaultAsync(b => b.Id == brandId.Value);
+                    if (brand != null)
+                    {
+                        brandFolder = brand.Name.ToLowerInvariant();
+                        foreach (var c in Path.GetInvalidFileNameChars())
+                        {
+                            brandFolder = brandFolder.Replace(c, '-');
+                        }
+                        brandFolder = brandFolder.Replace(" ", "-");
+                    }
+                }
+                else if (product.BrandId.HasValue)
+                {
+                    var brand = await _db.Brands.FirstOrDefaultAsync(b => b.Id == product.BrandId.Value);
+                    if (brand != null)
+                    {
+                        brandFolder = brand.Name.ToLowerInvariant();
+                        foreach (var c in Path.GetInvalidFileNameChars())
+                        {
+                            brandFolder = brandFolder.Replace(c, '-');
+                        }
+                        brandFolder = brandFolder.Replace(" ", "-");
+                    }
+                }
+
+                var webRoot = _env.WebRootPath;
+                if (!string.IsNullOrEmpty(product.ImageUrl))
+                {
+                    var oldPath = Path.Combine(webRoot, product.ImageUrl.TrimStart('/').Replace('/', Path.DirectorySeparatorChar));
+                    if (System.IO.File.Exists(oldPath))
+                    {
+                        try { System.IO.File.Delete(oldPath); } catch { }
+                    }
+                }
+
+                var fileName = GenerateImageFileName(brandFolder, ext);
+                var brandDir = Path.Combine(webRoot, "media", "images", "products", brandFolder);
+                Directory.CreateDirectory(brandDir);
+                var savePath = Path.Combine(brandDir, fileName);
+
+                using (var stream = System.IO.File.Create(savePath))
+                {
+                    await imageFile.CopyToAsync(stream);
+                }
+
+                product.ImageUrl = $"/media/images/products/{brandFolder}/{fileName}";
+            }
+            else if (!string.IsNullOrWhiteSpace(imageUrl))
+            {
+                product.ImageUrl = imageUrl;
+            }
+
             await _db.SaveChangesAsync();
             return Ok();
         }
@@ -186,30 +370,77 @@ namespace BTL_WEBDEV2025.Controllers
         // INVENTORY (ProductVariants)
         // =====================
         [HttpGet("/admin/api/inventory")]
-        public IActionResult GetInventory()
+        public async Task<IActionResult> GetInventory()
         {
             if (!IsAdmin()) return Unauthorized();
-            var rows = _db.ProductVariants
+            var rows = await _db.ProductVariants
+                .Include(v => v.Product)
                 .Select(v => new
                 {
                     v.Id,
                     v.ProductId,
-                    ProductName = _db.Products.Where(p => p.Id == v.ProductId).Select(p => p.Name).FirstOrDefault() ?? "",
+                    ProductName = v.Product != null ? v.Product.Name : "",
                     v.Size,
                     v.Color,
                     v.StockQuantity
-                }).ToList();
+                })
+                .OrderBy(v => v.ProductName)
+                .ThenBy(v => v.Size)
+                .ThenBy(v => v.Color)
+                .ToListAsync();
             return Ok(rows);
         }
 
         [HttpPost("/admin/api/inventory/update/{id:int}")]
-        public IActionResult UpdateInventory(int id, [FromBody] InventoryUpdateDto dto)
+        public async Task<IActionResult> UpdateInventory(int id, [FromBody] InventoryUpdateDto dto)
         {
             if (!IsAdmin()) return Unauthorized();
-            var variant = _db.ProductVariants.FirstOrDefault(v => v.Id == id);
+            var variant = await _db.ProductVariants.FirstOrDefaultAsync(v => v.Id == id);
             if (variant == null) return NotFound();
             variant.StockQuantity = Math.Max(0, dto.StockQuantity);
-            _db.SaveChanges();
+            if (!string.IsNullOrWhiteSpace(dto.Size)) variant.Size = dto.Size;
+            if (!string.IsNullOrWhiteSpace(dto.Color)) variant.Color = dto.Color;
+            await _db.SaveChangesAsync();
+            return Ok();
+        }
+
+        [HttpPost("/admin/api/inventory/create")]
+        public async Task<IActionResult> CreateInventory([FromBody] InventoryCreateDto dto)
+        {
+            if (!IsAdmin()) return Unauthorized();
+            if (dto.ProductId <= 0) return BadRequest("ProductId is required");
+            if (string.IsNullOrWhiteSpace(dto.Size)) return BadRequest("Size is required");
+            if (string.IsNullOrWhiteSpace(dto.Color)) return BadRequest("Color is required");
+
+            // Check if product exists
+            var product = await _db.Products.FirstOrDefaultAsync(p => p.Id == dto.ProductId);
+            if (product == null) return NotFound("Product not found");
+
+            // Check if variant already exists
+            var existing = await _db.ProductVariants
+                .FirstOrDefaultAsync(v => v.ProductId == dto.ProductId && v.Size == dto.Size && v.Color == dto.Color);
+            if (existing != null) return BadRequest("Variant with this Size and Color already exists");
+
+            var variant = new ProductVariant
+            {
+                ProductId = dto.ProductId,
+                Size = dto.Size,
+                Color = dto.Color,
+                StockQuantity = Math.Max(0, dto.StockQuantity)
+            };
+            _db.ProductVariants.Add(variant);
+            await _db.SaveChangesAsync();
+            return Ok(new { variant.Id });
+        }
+
+        [HttpPost("/admin/api/inventory/delete/{id:int}")]
+        public async Task<IActionResult> DeleteInventory(int id)
+        {
+            if (!IsAdmin()) return Unauthorized();
+            var variant = await _db.ProductVariants.FirstOrDefaultAsync(v => v.Id == id);
+            if (variant == null) return NotFound();
+            _db.ProductVariants.Remove(variant);
+            await _db.SaveChangesAsync();
             return Ok();
         }
 
@@ -255,7 +486,7 @@ namespace BTL_WEBDEV2025.Controllers
                 FullName = dto.FullName,
                 PhoneNumber = dto.PhoneNumber,
                 DateOfBirth = dto.DateOfBirth,
-                PasswordHash = "temp", // nên thay bằng quy trình tạo tài khoản chuẩn
+                PasswordHash = "temp", 
                 RoleId = 2
             };
             _db.Users.Add(user);
@@ -288,14 +519,14 @@ namespace BTL_WEBDEV2025.Controllers
             return Ok();
         }
 
-        // POST: Admin/Login => chuyển sang luồng Account/Login
+        // POST: Admin/Login 
         [HttpPost]
         public IActionResult Login(string username, string password)
         {
             return RedirectToAction("Login", "Account");
         }
 
-        // GET: Admin/Logout (link trong menu)
+        // GET: Admin/Logout 
         [HttpGet]
         public IActionResult Logout()
         {
@@ -303,119 +534,6 @@ namespace BTL_WEBDEV2025.Controllers
             HttpContext.Session.Remove("UserId");
             HttpContext.Session.Remove("UserEmail");
             return RedirectToAction("Login", "Account");
-        }
-
-        // GET: Admin/Create
-        public IActionResult Create()
-        {
-            if (!IsAdmin())
-            {
-                return RedirectToAction("Login");
-            }
-            
-            return View();
-        }
-
-        // POST: Admin/Create
-        [HttpPost]
-        [ValidateAntiForgeryToken]
-        public IActionResult Create([Bind("Name,Description,Price,DiscountPrice,ImageUrl,Category")] Product product)
-        {
-            if (!IsAdmin())
-            {
-                return RedirectToAction("Login");
-            }
-
-            if (ModelState.IsValid)
-            {
-                // Save to database
-                _db.Products.Add(product);
-                _db.SaveChanges();
-                
-                TempData["Success"] = "Product created successfully";
-                return RedirectToAction("Index");
-            }
-            
-            return View(product);
-        }
-
-        // GET: Admin/Edit/5
-        public IActionResult Edit(int? id)
-        {
-            if (!IsAdmin())
-            {
-                return RedirectToAction("Login");
-            }
-
-            if (id == null)
-            {
-                return NotFound();
-            }
-
-            var product = _db.Products.FirstOrDefault(p => p.Id == id);
-            if (product == null)
-            {
-                return NotFound();
-            }
-            
-            return View(product);
-        }
-
-        // POST: Admin/Edit/5
-        [HttpPost]
-        [ValidateAntiForgeryToken]
-        public IActionResult Edit(int id, [Bind("Id,Name,Description,Price,DiscountPrice,ImageUrl,Category")] Product product)
-        {
-            if (!IsAdmin())
-            {
-                return RedirectToAction("Login");
-            }
-
-            if (id != product.Id)
-            {
-                return NotFound();
-            }
-
-            if (ModelState.IsValid)
-            {
-                var existingProduct = _db.Products.FirstOrDefault(p => p.Id == id);
-                if (existingProduct != null)
-                {
-                    existingProduct.Name = product.Name;
-                    existingProduct.Description = product.Description;
-                    existingProduct.Price = product.Price;
-                    existingProduct.DiscountPrice = product.DiscountPrice;
-                    existingProduct.ImageUrl = product.ImageUrl;
-                    existingProduct.CategoryId = product.CategoryId;
-                    _db.SaveChanges();
-                }
-                
-                TempData["Success"] = "Product updated successfully";
-                return RedirectToAction("Index");
-            }
-            
-            return View(product);
-        }
-
-        // POST: Admin/Delete/5
-        [HttpPost]
-        [ValidateAntiForgeryToken]
-        public IActionResult Delete(int id)
-        {
-            if (!IsAdmin())
-            {
-                return RedirectToAction("Login");
-            }
-
-            var product = _db.Products.FirstOrDefault(p => p.Id == id);
-            if (product != null)
-            {
-                _db.Products.Remove(product);
-                _db.SaveChanges();
-                TempData["Success"] = "Product deleted successfully";
-            }
-            
-            return RedirectToAction("Index");
         }
 
         // GET: Admin/BulkImages
@@ -488,6 +606,23 @@ namespace BTL_WEBDEV2025.Controllers
                 }
                 else if (!updateOnly)
                 {
+                    // Tìm CategoryId từ tên category
+                    int? categoryId = null;
+                    if (!string.IsNullOrWhiteSpace(category))
+                    {
+                        var categoryEntity = await _db.Categories.FirstOrDefaultAsync(c => c.Name.Equals(category.Trim(), StringComparison.OrdinalIgnoreCase));
+                        if (categoryEntity != null)
+                        {
+                            categoryId = categoryEntity.Id;
+                        }
+                    }
+                    // Nếu không tìm thấy, mặc định là Unisex (CategoryId = 4)
+                    if (!categoryId.HasValue)
+                    {
+                        var unisexCategory = await _db.Categories.FirstOrDefaultAsync(c => c.Name == "Unisex");
+                        categoryId = unisexCategory?.Id ?? 4;
+                    }
+
                     var newProduct = new Product
                     {
                         Name = baseName,
@@ -495,7 +630,7 @@ namespace BTL_WEBDEV2025.Controllers
                         Price = 0,
                         DiscountPrice = null,
                         ImageUrl = relUrl,
-                        Category = string.IsNullOrWhiteSpace(category) ? "Unisex" : category!,
+                        CategoryId = categoryId,
                         IsFeatured = false,
                         IsSpecialDeal = false
                     };
@@ -555,7 +690,7 @@ namespace BTL_WEBDEV2025.Controllers
                 return RedirectToAction("Settings");
             }
 
-            // Nếu admin đăng nhập theo tài khoản trong bảng Users (RoleId=1), cập nhật mật khẩu của tài khoản đó
+            
             var userId = HttpContext.Session.GetInt32("UserId");
             if (userId.HasValue)
             {

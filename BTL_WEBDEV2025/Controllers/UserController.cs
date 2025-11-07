@@ -38,7 +38,8 @@ namespace BTL_WEBDEV2025.Controllers
             var ordersData = _db.Orders
                 .Where(o => o.UserId == userId.Value)
                 .Include(o => o.OrderDetails)
-                    .ThenInclude(od => od.Product)
+                    .ThenInclude(od => od.ProductVariant!)
+                        .ThenInclude(pv => pv!.Product)
                 .OrderByDescending(o => o.CreatedAt)
                 .ToList();
 
@@ -49,15 +50,24 @@ namespace BTL_WEBDEV2025.Controllers
                 TotalAmount = o.TotalAmount,
                 Status = o.Status,
                 PaymentMethod = o.PaymentMethod,
-                Items = o.OrderDetails.Select(d => new OrderItemVm
+                Items = o.OrderDetails.Select(d =>
                 {
-                    OrderDetailId = d.Id,
-                    ProductId = d.ProductId,
-                    ProductName = d.Product != null ? d.Product.Name : ("#" + d.ProductId),
-                    ProductImageUrl = d.Product != null ? d.Product.ImageUrl : "",
-                    Quantity = d.Quantity,
-                    UnitPrice = d.UnitPrice,
-                    SubTotal = d.Quantity * d.UnitPrice
+                    var variant = d.ProductVariant;
+                    var product = variant?.Product;
+                    return new OrderItemVm
+                    {
+                        OrderDetailId = d.Id,
+                        ProductId = product != null ? product.Id : 0,
+                        ProductName = product != null 
+                            ? product.Name 
+                            : ("Variant #" + d.ProductVariantId),
+                        ProductImageUrl = product != null ? product.ImageUrl : "",
+                        Quantity = d.Quantity,
+                        UnitPrice = d.UnitPrice,
+                        SubTotal = d.Quantity * d.UnitPrice,
+                        Size = variant != null && !string.IsNullOrWhiteSpace(variant.Size) ? variant.Size : "",
+                        Color = variant != null && !string.IsNullOrWhiteSpace(variant.Color) ? variant.Color : ""
+                    };
                 }).ToList()
             }).ToList();
             return View(orders);
@@ -83,6 +93,8 @@ namespace BTL_WEBDEV2025.Controllers
             public int Quantity { get; set; }
             public decimal UnitPrice { get; set; }
             public decimal SubTotal { get; set; }
+            public string Size { get; set; } = string.Empty;
+            public string Color { get; set; } = string.Empty;
         }
 
         public class OrderVm

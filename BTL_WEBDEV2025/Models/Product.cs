@@ -8,8 +8,6 @@ namespace BTL_WEBDEV2025.Models
         public decimal Price { get; set; }
         public decimal? DiscountPrice { get; set; }
         public string ImageUrl { get; set; } = string.Empty;
-        // Legacy field for UI compatibility; prefer CategoryId/BrandId
-        public string Category { get; set; } = string.Empty;
         public int? CategoryId { get; set; }
         public Category? CategoryRef { get; set; }
         public int? BrandId { get; set; }

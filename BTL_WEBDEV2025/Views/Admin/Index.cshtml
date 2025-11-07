@@ -8,7 +8,6 @@
     var isInventory = string.Equals(tab, "inventory", StringComparison.OrdinalIgnoreCase);
     ViewData["ActiveMenu"] = isInventory ? "inventory" : (isReport ? "report" : (isCustomers ? "customers" : (isProducts ? "products" : "dashboard")));
 }
-
 <div class="container-fluid px-4 my-4">
     @if (!isProducts && !isCustomers && !isInventory && !isReport) {
         <h1 class="fw-bold mb-4">Overview</h1>
@@ -88,6 +87,7 @@
                             <th>Name</th>
                             <th>Description</th>
                             <th>Price</th>
+                            <th>Discount Price</th>
                             <th>Category</th>
                             <th>Image</th>
                             <th></th>
@@ -101,9 +101,21 @@
 
     @if (isInventory) {
         <div>
-            <div class="d-flex justify-content-between align-items-center mb-2">
+            <div class="d-flex justify-content-between align-items-center mb-3">
                 <h1 class="fw-bold">Inventory</h1>
-                <button class="btn btn-outline-secondary" id="btnReloadStock">Reload</button>
+                <div class="d-flex gap-2">
+                    <button class="btn btn-dark" id="btnAddVariant"><i class="bi bi-plus-lg"></i> Add Variant</button>
+                    <button class="btn btn-outline-secondary" id="btnReloadStock">Reload</button>
+                </div>
+            </div>
+            <div class="mb-3">
+                <div class="input-group" style="max-width: 400px;">
+                    <span class="input-group-text"><i class="bi bi-search"></i></span>
+                    <input type="text" class="form-control" id="inventorySearchInput" placeholder="Search by product name..." />
+                    <button class="btn btn-outline-secondary" type="button" id="inventorySearchClear" style="display: none;">
+                        <i class="bi bi-x-lg"></i>
+                    </button>
+                </div>
             </div>
             <div class="table-responsive">
                 <table class="table table-striped align-middle">
@@ -185,7 +197,7 @@
         <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
       </div>
       <div class="modal-body">
-        <form id="productForm" class="row g-3">
+        <form id="productForm" class="row g-3" enctype="multipart/form-data">
           <input type="hidden" id="pId" />
           <div class="col-12">
             <label class="form-label">Name</label>
@@ -200,18 +212,79 @@
             <input type="number" step="0.01" min="0" class="form-control" id="pPrice" required />
           </div>
           <div class="col-md-6">
+            <label class="form-label">Discount Price (USD)</label>
+            <input type="number" step="0.01" min="0" class="form-control" id="pDiscountPrice" />
+            <small class="text-muted">Optional - leave empty if no discount</small>
+          </div>
+          <div class="col-md-6">
             <label class="form-label">Category</label>
-            <input class="form-control" id="pCategory" />
+            <select class="form-control" id="pCategoryId">
+              <option value="">-- Select Category --</option>
+            </select>
+          </div>
+          <div class="col-md-6">
+            <label class="form-label">Brand</label>
+            <select class="form-control" id="pBrandId">
+              <option value="">-- Select Brand --</option>
+            </select>
           </div>
           <div class="col-12">
-            <label class="form-label">Image URL</label>
-            <input class="form-control" id="pImageUrl" />
+            <label class="form-label">Product Image</label>
+            <input type="file" class="form-control" id="pImageFile" accept="image/jpeg,image/jpg,image/png,image/webp" />
+          </div>
+          <div class="col-12" id="pImagePreviewContainer" style="display: none;">
+            <label class="form-label">Current Image</label>
+            <img id="pImagePreview" src="" alt="Preview" style="max-height: 150px; max-width: 100%;" />
+            <div class="mt-2">
+              <label class="form-label">Or enter Image URL</label>
+              <input class="form-control" id="pImageUrl" placeholder="Leave empty if uploading file" />
+            </div>
           </div>
         </form>
       </div>
       <div class="modal-footer">
         <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
         <button type="button" class="btn btn-dark" id="saveProductBtn">Save</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Inventory Variant Modal -->
+<div class="modal fade" id="variantModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="variantModalTitle">Add Variant</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body">
+        <form id="variantForm" class="row g-3">
+          <input type="hidden" id="vId" />
+          <div class="col-12">
+            <label class="form-label">Product</label>
+            <select class="form-control" id="vProductId" required>
+              <option value="">-- Select Product --</option>
+            </select>
+            <small class="text-muted" id="vProductIdNote" style="display: none;">Product cannot be changed when editing</small>
+          </div>
+          <div class="col-md-6">
+            <label class="form-label">Size</label>
+            <input class="form-control" id="vSize" required />
+          </div>
+          <div class="col-md-6">
+            <label class="form-label">Color</label>
+            <input class="form-control" id="vColor" required />
+          </div>
+          <div class="col-12">
+            <label class="form-label">Stock Quantity</label>
+            <input type="number" min="0" class="form-control" id="vStockQuantity" value="0" required />
+          </div>
+        </form>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+        <button type="button" class="btn btn-dark" id="saveVariantBtn">Save</button>
       </div>
     </div>
   </div>
@@ -276,6 +349,7 @@
                 document.getElementById('stat-sales').textContent = fmtUSD(s.totalSales);
                 document.getElementById('stat-orders').textContent = s.totalOrders;
                 document.getElementById('stat-customers').textContent = s.totalCustomers;
+                document.getElementById('stat-profit').textContent = fmtUSD(s.profit || s.totalSales);
             }).catch(function(error) { /* Stats fetch error */ });
 
             const ctx = document.getElementById('salesChart')?.getContext('2d');
@@ -290,6 +364,28 @@
             }
         }
 
+        // Load brands
+        let brandsList = [];
+        async function loadBrands(){
+            brandsList = await fetchJson('/admin/api/brands');
+            const select = document.getElementById('pBrandId');
+            if(select){
+                select.innerHTML = '<option value="">-- Select Brand --</option>' + 
+                    brandsList.map(b=>`<option value="${b.id}">${b.name}</option>`).join('');
+            }
+        }
+
+        // Load categories
+        let categoriesList = [];
+        async function loadCategories(){
+            categoriesList = await fetchJson('/admin/api/categories');
+            const select = document.getElementById('pCategoryId');
+            if(select){
+                select.innerHTML = '<option value="">-- Select Category --</option>' + 
+                    categoriesList.map(c=>`<option value="${c.id}">${c.name}</option>`).join('');
+            }
+        }
+
         // Products: list + CRUD
         async function loadProducts(){
             const rows = await fetchJson('/admin/api/products');
@@ -301,6 +397,7 @@
                   <td>${p.name}</td>
                   <td>${p.description||''}</td>
                   <td>${fmtUSD(p.price)}</td>
+                  <td>${p.discountPrice ? fmtUSD(p.discountPrice) : '-'}</td>
                   <td>${p.category||''}</td>
                   <td>${p.imageUrl?`<img src="${p.imageUrl}" style="height:40px">`:''}</td>
                   <td>
@@ -318,39 +415,83 @@
             document.getElementById('pName').value = data?.name||'';
             document.getElementById('pDescription').value = data?.description||'';
             document.getElementById('pPrice').value = data?.price||0;
-            document.getElementById('pCategory').value = data?.category||'';
-            document.getElementById('pImageUrl').value = data?.imageUrl||'';
+            document.getElementById('pDiscountPrice').value = data?.discountPrice||'';
+            document.getElementById('pCategoryId').value = data?.categoryId||'';
+            document.getElementById('pBrandId').value = data?.brandId||'';
+            document.getElementById('pImageFile').value = '';
+            const previewContainer = document.getElementById('pImagePreviewContainer');
+            const previewImg = document.getElementById('pImagePreview');
+            const imageUrlInput = document.getElementById('pImageUrl');
+            if(data?.imageUrl){
+                previewImg.src = data.imageUrl;
+                previewContainer.style.display = 'block';
+                imageUrlInput.value = data.imageUrl;
+            } else {
+                previewContainer.style.display = 'none';
+                imageUrlInput.value = '';
+            }
             productModal?.show();
         }
         async function saveProduct(){
             const id = document.getElementById('pId').value;
-            const payload = {
-                name: document.getElementById('pName').value,
-                description: document.getElementById('pDescription').value,
-                price: parseFloat(document.getElementById('pPrice').value||'0'),
-                category: document.getElementById('pCategory').value,
-                imageUrl: document.getElementById('pImageUrl').value
-            };
-            if (id){
-                await fetchJson(`/admin/api/products/update/${id}`,{ method:'POST', body: JSON.stringify(payload) });
-            } else {
-                await fetchJson('/admin/api/products/create',{ method:'POST', body: JSON.stringify(payload) });
+            const formData = new FormData();
+            formData.append('name', document.getElementById('pName').value);
+            formData.append('description', document.getElementById('pDescription').value);
+            formData.append('price', document.getElementById('pPrice').value);
+            const discountPrice = document.getElementById('pDiscountPrice').value;
+            if(discountPrice) formData.append('discountPrice', discountPrice);
+            const categoryId = document.getElementById('pCategoryId').value;
+            if(categoryId) formData.append('categoryId', categoryId);
+            const brandId = document.getElementById('pBrandId').value;
+            if(brandId) formData.append('brandId', brandId);
+            
+            const imageFile = document.getElementById('pImageFile').files[0];
+            if(imageFile){
+                formData.append('imageFile', imageFile);
+            } else if (id) {
+                const imageUrl = document.getElementById('pImageUrl').value;
+                if(imageUrl) formData.append('imageUrl', imageUrl);
             }
-            productModal?.hide();
-            await loadProducts();
+
+            try {
+                if (id){
+                    const res = await fetch(`/admin/api/products/update/${id}`, {
+                        method: 'POST',
+                        body: formData
+                    });
+                    if (!res.ok) throw new Error(await res.text());
+                } else {
+                    const res = await fetch('/admin/api/products/create', {
+                        method: 'POST',
+                        body: formData
+                    });
+                    if (!res.ok) throw new Error(await res.text());
+                }
+                productModal?.hide();
+                await loadProducts();
+            } catch(error) {
+                alert('Error: ' + error.message);
+            }
         }
         async function addProduct(){ openProductModal('add'); }
         async function editProduct(id){
-            const row = [...document.querySelectorAll('#tableProducts tr')].find(tr=>tr.firstElementChild?.textContent==id);
-            const data = row ? {
-                id,
-                name: row.children[1].textContent,
-                description: row.children[2].textContent,
-                price: (row.children[3].textContent||'').replace(/[^0-9.]/g,''),
-                category: row.children[4].textContent,
-                imageUrl: row.children[5].querySelector('img')?.getAttribute('src')||''
-            } : { id };
-            openProductModal('edit', data);
+            // Fetch full product data from API
+            const products = await fetchJson('/admin/api/products');
+            const product = products.find(p => p.id == id);
+            if(product){
+                openProductModal('edit', {
+                    id: product.id,
+                    name: product.name,
+                    description: product.description,
+                    price: product.price,
+                    discountPrice: product.discountPrice,
+                    categoryId: product.categoryId,
+                    brandId: product.brandId,
+                    imageUrl: product.imageUrl
+                });
+            } else {
+                alert('Product not found');
+            }
         }
         document.getElementById('saveProductBtn')?.addEventListener('click', saveProduct);
         async function deleteProduct(id){
@@ -359,6 +500,8 @@
             await loadProducts();
         }
         if (isProducts) {
+            loadBrands();
+            loadCategories();
             loadProducts();
             document.getElementById('btnAddProduct')?.addEventListener('click', addProduct);
             window.editProduct = editProduct; window.deleteProduct = deleteProduct; // expose for onclick
@@ -433,28 +576,165 @@
             window.editCustomer = editCustomer; window.deleteCustomer = deleteCustomer;
         }
 
-        // Inventory: list + inline update
+        // Load products for variant modal
+        let productsList = [];
+        async function loadProductsForInventory(){
+            productsList = await fetchJson('/admin/api/products');
+            const select = document.getElementById('vProductId');
+            if(select){
+                select.innerHTML = '<option value="">-- Select Product --</option>' + 
+                    productsList.map(p=>`<option value="${p.id}">${p.name}</option>`).join('');
+            }
+        }
+
+        // Inventory: list + CRUD + Search
+        let allInventoryRows = [];
         async function loadInventory(){
-            const rows = await fetchJson('/admin/api/inventory');
-            const tb = document.getElementById('tableInventory'); if(!tb) return;
-            tb.innerHTML = rows.map(v=>`
-                <tr>
+            allInventoryRows = await fetchJson('/admin/api/inventory');
+            renderInventoryTable();
+        }
+        
+        function renderInventoryTable(filterText = ''){
+            const tb = document.getElementById('tableInventory'); 
+            if(!tb) return;
+            
+            const searchLower = filterText.toLowerCase().trim();
+            const filtered = searchLower ? 
+                allInventoryRows.filter(v => 
+                    v.productName.toLowerCase().includes(searchLower) ||
+                    v.size.toLowerCase().includes(searchLower) ||
+                    v.color.toLowerCase().includes(searchLower) ||
+                    v.productId.toString().includes(searchLower)
+                ) : 
+                allInventoryRows;
+            
+            if(filtered.length === 0 && searchLower){
+                tb.innerHTML = `<tr><td colspan="6" class="text-center text-muted py-4">No variants found matching "${filterText}"</td></tr>`;
+                return;
+            }
+            
+            tb.innerHTML = filtered.map(v=>`
+                <tr data-product-name="${v.productName.toLowerCase()}" data-product-id="${v.productId}">
                   <td>${v.id}</td>
                   <td>${v.productName} (#${v.productId})</td>
                   <td>${v.size}</td>
                   <td>${v.color}</td>
-                  <td><input type="number" class="form-control form-control-sm w-auto" value="${v.stockQuantity}" min="0" id="stk-${v.id}" /></td>
-                  <td><button class="btn btn-sm btn-dark" onclick="updateStock(${v.id})">Save</button></td>
+                  <td>${v.stockQuantity}</td>
+                  <td>
+                    <button class="btn btn-sm btn-outline-primary" onclick="editVariant(${v.id})">Edit</button>
+                    <button class="btn btn-sm btn-outline-danger ms-2" onclick="deleteVariant(${v.id})">Delete</button>
+                  </td>
                 </tr>`).join('');
         }
-        async function updateStock(id){
-            const val = parseInt(document.getElementById('stk-'+id).value||'0',10);
-            await fetchJson(`/admin/api/inventory/update/${id}`,{ method:'POST', body: JSON.stringify({ stockQuantity: val }) });
+        
+        function setupInventorySearch(){
+            const searchInput = document.getElementById('inventorySearchInput');
+            const clearBtn = document.getElementById('inventorySearchClear');
+            
+            if(searchInput){
+                searchInput.addEventListener('input', function(){
+                    const query = this.value;
+                    renderInventoryTable(query);
+                    clearBtn.style.display = query ? 'block' : 'none';
+                });
+            }
+            
+            if(clearBtn){
+                clearBtn.addEventListener('click', function(){
+                    searchInput.value = '';
+                    renderInventoryTable('');
+                    this.style.display = 'none';
+                });
+            }
+        }
+
+        // Variant modal workflow
+        const variantModalEl = document.getElementById('variantModal');
+        const variantModal = variantModalEl ? new bootstrap.Modal(variantModalEl) : null;
+        function openVariantModal(mode, data){
+            document.getElementById('variantModalTitle').textContent = mode === 'edit' ? 'Edit Variant' : 'Add Variant';
+            document.getElementById('vId').value = data?.id||'';
+            const productSelect = document.getElementById('vProductId');
+            const productNote = document.getElementById('vProductIdNote');
+            if(mode === 'edit'){
+                productSelect.value = data?.productId||'';
+                productSelect.disabled = true;
+                productNote.style.display = 'block';
+            } else {
+                productSelect.value = '';
+                productSelect.disabled = false;
+                productNote.style.display = 'none';
+            }
+            document.getElementById('vSize').value = data?.size||'';
+            document.getElementById('vColor').value = data?.color||'';
+            document.getElementById('vStockQuantity').value = data?.stockQuantity||0;
+            variantModal?.show();
+        }
+        async function saveVariant(){
+            const id = document.getElementById('vId').value;
+            const payload = {
+                productId: parseInt(document.getElementById('vProductId').value),
+                size: document.getElementById('vSize').value,
+                color: document.getElementById('vColor').value,
+                stockQuantity: parseInt(document.getElementById('vStockQuantity').value||'0',10)
+            };
+            try {
+                if (id){
+                    await fetchJson(`/admin/api/inventory/update/${id}`,{ 
+                        method:'POST', 
+                        body: JSON.stringify({ 
+                            stockQuantity: payload.stockQuantity,
+                            Size: payload.size,
+                            Color: payload.color
+                        }) 
+                    });
+                } else {
+                    await fetchJson('/admin/api/inventory/create',{ method:'POST', body: JSON.stringify(payload) });
+                }
+                variantModal?.hide();
+                await loadInventory();
+            } catch(error) {
+                alert('Error: ' + error.message);
+            }
+        }
+        async function addVariant(){ 
+            await loadProductsForInventory();
+            openVariantModal('add'); 
+        }
+        async function editVariant(id){
+            const rows = await fetchJson('/admin/api/inventory');
+            const variant = rows.find(v => v.id == id);
+            if(variant){
+                await loadProductsForInventory();
+                openVariantModal('edit', {
+                    id: variant.id,
+                    productId: variant.productId,
+                    size: variant.size,
+                    color: variant.color,
+                    stockQuantity: variant.stockQuantity
+                });
+            } else {
+                alert('Variant not found');
+            }
+        }
+        async function deleteVariant(id){
+            if(!confirm('Delete this variant?')) return;
+            try {
+                await fetchJson(`/admin/api/inventory/delete/${id}`,{ method:'POST' });
+                await loadInventory();
+            } catch(error) {
+                alert('Error: ' + error.message);
+            }
         }
         if (isInventory){
+            loadProductsForInventory();
             loadInventory();
+            setupInventorySearch();
             document.getElementById('btnReloadStock')?.addEventListener('click', loadInventory);
-            window.updateStock = updateStock;
+            document.getElementById('btnAddVariant')?.addEventListener('click', addVariant);
+            document.getElementById('saveVariantBtn')?.addEventListener('click', saveVariant);
+            window.editVariant = editVariant; 
+            window.deleteVariant = deleteVariant;
         }
 
         // Report minimal

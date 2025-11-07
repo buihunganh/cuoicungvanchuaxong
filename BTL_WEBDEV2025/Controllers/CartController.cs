@@ -185,10 +185,51 @@ namespace BTL_WEBDEV2025.Controllers
 
                 foreach (var it in cartItems)
                 {
+                    // Tìm ProductVariant từ ProductId, Size, Color
+                    ProductVariant? variant = null;
+                    if (it.ProductId > 0 && !string.IsNullOrWhiteSpace(it.Size) && !string.IsNullOrWhiteSpace(it.Color))
+                    {
+                        variant = await _db.ProductVariants
+                            .FirstOrDefaultAsync(v => v.ProductId == it.ProductId 
+                                && v.Size == it.Size 
+                                && v.Color == it.Color);
+                        if (variant == null)
+                        {
+                            // Nếu không tìm thấy variant, dùng variant đầu tiên của product
+                            variant = await _db.ProductVariants
+                                .FirstOrDefaultAsync(v => v.ProductId == it.ProductId);
+                        }
+                    }
+                    else if (it.ProductId > 0)
+                    {
+                        // Nếu không có Size/Color, lấy variant đầu tiên
+                        variant = await _db.ProductVariants
+                            .FirstOrDefaultAsync(v => v.ProductId == it.ProductId);
+                    }
+
+                    if (variant == null)
+                    {
+                        _logger.LogWarning("Could not find ProductVariant for ProductId={ProductId}, Size={Size}, Color={Color}", 
+                            it.ProductId, it.Size, it.Color);
+                        continue; // Skip this item if no variant found
+                    }
+
+                    // Kiểm tra đủ hàng
+                    if (variant.StockQuantity < it.Quantity)
+                    {
+                        _logger.LogWarning("Insufficient stock for ProductVariantId={VariantId}, Requested={Requested}, Available={Available}", 
+                            variant.Id, it.Quantity, variant.StockQuantity);
+                        throw new Exception($"Insufficient stock for {it.ProductName}. Available: {variant.StockQuantity}, Requested: {it.Quantity}");
+                    }
+
+                    // Trừ số lượng tồn kho
+                    variant.StockQuantity -= it.Quantity;
+                    _db.ProductVariants.Update(variant);
+
                     var od = new OrderDetail
                     {
                         OrderId = order.Id,
-                        ProductId = it.ProductId,
+                        ProductVariantId = variant.Id,
                         Quantity = it.Quantity,
                         UnitPrice = it.Price
                     };
