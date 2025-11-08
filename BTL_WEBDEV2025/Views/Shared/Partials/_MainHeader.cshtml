@@ -407,59 +407,84 @@ window.isAuthenticated = @isAuth;
     document.addEventListener('keydown', function(e){ if(e.key==='Escape' && modal.classList.contains('show')) hideModal(); });
 
     addBtn.addEventListener('click', async function(){
-        // Get price directly from dataset which should be a clean number string
-        const priceFromDataset = parseFloat(modal.dataset.price || '0') || 0;
-        
-        const item = {
-            name: modal.dataset.name || nameEl.textContent,
-            price: priceFromDataset, // Use parsed price directly
-            img: modal.dataset.img || imgEl.src,
-            size: (sizeEl?.value || '').trim(),
-            color: (colorEl?.value || '').trim(),
-            qty: parseInt(qtyEl?.value||1,10),
-            productId: modal.dataset.productId || null
-        };
+        // --- VALIDATION START ---
+        // Kiểm tra xem dropdown size có đang hiển thị và chưa được chọn không
+        const sizeVisible = sizeContainer && sizeContainer.style.display === 'block';
+        const sizeInvalid = sizeVisible && sizeEl && sizeEl.value === '';
+        
+        // Kiểm tra xem dropdown color có đang hiển thị và chưa được chọn không
+        const colorVisible = colorContainer && colorContainer.style.display === 'block';
+        const colorInvalid = colorVisible && colorEl && colorEl.value === '';
 
-        if(!window.isAuthenticated){
-            // show toast and redirect to login
-            const toast = document.createElement('div');
-            toast.textContent = 'Please sign in before adding to cart';
-            toast.style.cssText = 'position:fixed;right:20px;bottom:20px;background:#ef4a64;color:#fff;padding:10px 14px;border-radius:8px;z-index:99999;box-shadow:0 8px 20px rgba(0,0,0,0.2);';
-            document.body.appendChild(toast);
-            setTimeout(()=>{ toast.remove(); window.location.href = '/Account/Login'; },1200);
-            return;
-        }
+        // Tạo thông báo lỗi
+        const errorMessages = [];
+        if (sizeInvalid) {
+            errorMessages.push('size');
+        }
+        if (colorInvalid) {
+            errorMessages.push('color');
+        }
 
-        // Price is already parsed and stored in item.price as number
-        const priceValue = item.price;
+        // Nếu có lỗi, hiển thị thông báo và dừng lại
+        if (errorMessages.length > 0) {
+            alert(`Please select a ${errorMessages.join(' and ')}.`);
+            return; // Dừng, không add to cart
+        }
+        // --- VALIDATION END ---
 
-        // send to server using form-encoded POST to Cart/AddToCart
-        try{
-            const form = new URLSearchParams();
-            form.append('productId', item.productId || '0');
-            form.append('productName', item.name || '');
-            form.append('price', priceValue.toString());
-            form.append('imageUrl', item.img || '');
-            form.append('quantity', (item.qty||1).toString());
-            form.append('size', item.size || '');
-            form.append('color', item.color || '');
+        // Get price directly from dataset which should be a clean number string
+        const priceFromDataset = parseFloat(modal.dataset.price || '0') || 0;
+        
+        const item = {
+            name: modal.dataset.name || nameEl.textContent,
+            price: priceFromDataset, // Use parsed price directly
+            img: modal.dataset.img || imgEl.src,
+            size: (sizeEl?.value || '').trim(),
+            color: (colorEl?.value || '').trim(),
+            qty: parseInt(qtyEl?.value||1,10),
+            productId: modal.dataset.productId || null
+        };
 
-            const res = await fetch('/Cart/AddToCart', { method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, body: form.toString() });
-            if(res.ok){
-                const j = await res.json();
-                updateCartBadge();
-                hideModal();
-                const toast = document.createElement('div');
-                toast.textContent = 'Added to cart';
-                toast.style.cssText = 'position:fixed;right:20px;bottom:20px;background:#111;color:#fff;padding:10px 14px;border-radius:8px;z-index:99999;box-shadow:0 8px 20px rgba(0,0,0,0.2);';
-                document.body.appendChild(toast);
-                setTimeout(()=>toast.remove(),1600);
-            } else {
-                const txt = await res.text();
-                alert('Failed to add to cart: '+txt);
-            }
-        }catch(e){ alert('Error adding to cart'); }
-    });
+        if(!window.isAuthenticated){
+            // show toast and redirect to login
+            const toast = document.createElement('div');
+            toast.textContent = 'Please sign in before adding to cart';
+            toast.style.cssText = 'position:fixed;right:20px;bottom:20px;background:#ef4a64;color:#fff;padding:10px 14px;border-radius:8px;z-index:99999;box-shadow:0 8px 20px rgba(0,0,0,0.2);';
+            document.body.appendChild(toast);
+            setTimeout(()=>{ toast.remove(); window.location.href = '/Account/Login'; },1200);
+            return;
+        }
+
+        // Price is already parsed and stored in item.price as number
+        const priceValue = item.price;
+
+        // send to server using form-encoded POST to Cart/AddToCart
+        try{
+            const form = new URLSearchParams();
+            form.append('productId', item.productId || '0');
+            form.append('productName', item.name || '');
+            form.append('price', priceValue.toString());
+            form.append('imageUrl', item.img || '');
+            form.append('quantity', (item.qty||1).toString());
+            form.append('size', item.size || '');
+            form.append('color', item.color || '');
+
+            const res = await fetch('/Cart/AddToCart', { method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, body: form.toString() });
+            if(res.ok){
+                const j = await res.json();
+                updateCartBadge();
+                hideModal();
+                const toast = document.createElement('div');
+                toast.textContent = 'Added to cart';
+                toast.style.cssText = 'position:fixed;right:20px;bottom:20px;background:#111;color:#fff;padding:10px 14px;border-radius:8px;z-index:99999;box-shadow:0 8px 20px rgba(0,0,0,0.2);';
+                document.body.appendChild(toast);
+                setTimeout(()=>toast.remove(),1600);
+            } else {
+                const txt = await res.text();
+                alert('Failed to add to cart: '+txt);
+            }
+        }catch(e){ alert('Error adding to cart'); }
+    });
 })();
 
 // Search functionality
