@@ -1,7 +1,9 @@
-## 👥 Bảng Phân Công Công Việc
+Bùi Hùng Anh: Trang Quản trị (Admin), vẽ Wireframe, định hướng web, API. (Hoàn thành tốt)
 
-| Bùi Hùng Anh (Hoàn thành tốt) | Trần Xuân Bằng (Hoàn thành tốt) | Phạm Việt Tùng (Hoàn thành tốt) | Tạ Trọng Dũng (Hoàn thành tốt) | Nguyễn Thành Đạt (Hoàn thành tốt) |
-| :--- | :--- | :--- | :--- | :--- |
-| Trang Quản trị (Admin) | Thiết kế CSDL (ERD) + SQL | Trang Sản phẩm (Product) | Trang chủ (Home) | Trang cá nhân (User Profile) |
-| Vẽ Wireframe, định hướng web | API | Giỏ hàng (Cart) | Viết Báo cáo | Form Đăng nhập/Đăng ký |
-| API | | API | API | |
+Trần Xuân Bằng: Thiết kế Cơ sở dữ liệu (ERD) + SQL, API. (Hoàn thành tốt)
+
+Phạm Việt Tùng: Trang Sản phẩm (Product), Giỏ hàng (Cart), API. (Hoàn thành tốt)
+
+Tạ Trọng Dũng: Trang chủ (Home), viết Báo cáo, API. (Hoàn thành tốt)
+
+Nguyễn Thành Đạt: Trang cá nhân (User Profile), Form Đăng nhập/Đăng ký, . (Hoàn thành tốt)
