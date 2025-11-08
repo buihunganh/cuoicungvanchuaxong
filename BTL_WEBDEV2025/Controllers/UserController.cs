@@ -146,14 +146,22 @@ namespace BTL_WEBDEV2025.Controllers
             var user = _db.Users.FirstOrDefault(u => u.Id == userId.Value);
             if (user == null) return RedirectToAction("Login", "Account");
 
-            _db.Users.Remove(user);
-            _db.SaveChanges();
+            try
+            {
+                _db.Users.Remove(user);
+                _db.SaveChanges();
 
-            HttpContext.Session.Remove("UserId");
-            HttpContext.Session.Remove("UserEmail");
-            HttpContext.Session.Remove("UserName");
-            TempData["AuthMessage"] = "Account deleted.";
-            return RedirectToAction("Login", "Account");
+                // Clear all session data
+                HttpContext.Session.Clear();
+
+                TempData["AuthMessage"] = "Your account has been successfully deleted.";
+                return RedirectToAction("Login", "Account");
+            }
+            catch (Exception)
+            {
+                TempData["UserMsgError"] = "Failed to delete account. Please try again later.";
+                return RedirectToAction("Index");
+            }
         }
 
         [HttpPost]

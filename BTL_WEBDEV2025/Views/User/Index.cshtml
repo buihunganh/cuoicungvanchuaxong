@@ -92,16 +92,25 @@
                                 </div>
                         <div class="col-12 d-flex justify-content-between align-items-center">
                             <div>
-                                <form asp-controller="User" asp-action="DeleteAccount" method="post" onsubmit="return confirm('Delete your account? This cannot be undone.');" class="d-inline">
-                                    @Html.AntiForgeryToken()
-                                    <button type="submit" class="btn btn-outline-danger btn-sm">Delete account</button>
-                                </form>
+                                <button type="button" class="btn btn-outline-danger btn-sm" onclick="confirmDelete()">Delete account</button>
                             </div>
                             <div>
                                 <button type="submit" class="btn btn-dark">Save</button>
                             </div>
                         </div>
     </form>
+
+    <form asp-controller="User" asp-action="DeleteAccount" method="post" id="deleteForm">
+        @Html.AntiForgeryToken()
+    </form>
+
+    <script>
+        function confirmDelete() {
+            if (confirm('Are you sure you want to delete your account?\n\nThis action cannot be undone and you will lose all your data including order history.')) {
+                document.getElementById('deleteForm').submit();
+            }
+        }
+    </script>
                         </div>
                     </div>
                 </div>
